@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Outlaw Robbery Creator</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div id="app">
+    <div class="card">
+      <div class="header">
+        <img src="icon.svg" width="20" height="20" alt="icon"/>
+        <div class="title">Outlaw Robbery Creator <span class="badge">NUI</span></div>
+        <div class="actions">
+          <button id="btn-close" class="btn">Close (ESC)</button>
+        </div>
+      </div>
+
+      <div class="body">
+        <div class="col list">
+          <div class="muted">Existing Spots</div>
+          <div id="status" class="muted small"></div>
+          <ul id="list" class="list"></ul>
+        </div>
+
+        <div class="col form">
+          <label>Label<input id="f-label" class="input" placeholder="Ex: Register #1"></label>
+
+          <label>Type
+            <select id="f-type" class="input"></select>
+          </label>
+
+          <div class="grid2">
+            <label>Radius<input id="f-radius" class="input" type="number" step="0.1" value="2.0"></label>
+            <label>Cooldown (s)<input id="f-cd" class="input" type="number" value="1800"></label>
+            <label>Reward Min<input id="f-rmin" class="input" type="number" value="2500"></label>
+            <label>Reward Max<input id="f-rmax" class="input" type="number" value="5500"></label>
+            <label>Min Police<input id="f-cops" class="input" type="number" value="2"></label>
+          </div>
+
+          <div class="grid2">
+            <label>X<input id="f-x" class="input" type="number" step="0.01"></label>
+            <label>Y<input id="f-y" class="input" type="number" step="0.01"></label>
+            <label>Z<input id="f-z" class="input" type="number" step="0.01"></label>
+            <label>H<input id="f-h" class="input" type="number" step="0.1"></label>
+          </div>
+
+          <div class="row">
+            <button id="btn-coords" class="btn">Use Player Coords</button>
+            <div class="spacer"></div>
+            <button id="btn-save" class="btn primary">Save</button>
+            <button id="btn-delete" class="btn danger">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
