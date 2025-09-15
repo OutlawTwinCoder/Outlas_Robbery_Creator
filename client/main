@@ -1,0 +1,163 @@
+local showing = false
+local zones = {} -- [id] = zoneHandle
+
+local function notify(msg)
+  if lib and lib.notify then
+    lib.notify({title='Outlaw', description=msg, type='inform'})
+  else
+    print(('[Outlaw] %s'):format(msg))
+  end
+end
+
+local function open_ui()
+  local data = lib.callback.await('orc:list', false)
+  if data and data.error == 'no_perm' then
+    notify(('No permission (%s)'):format(Config.CreatorAce))
+    return
+  end
+  SetNuiFocus(true, true)
+  showing = true
+  SendNUIMessage({ action = 'open', payload = { list = data.list or {}, types = data.types or {}, defaults = data.defaults or {} } })
+end
+
+local function close_ui()
+  showing = false
+  SetNuiFocus(false, false)
+  SendNUIMessage({ action = 'close' })
+end
+
+RegisterCommand('robmenu', function() open_ui() end, false)
+RegisterKeyMapping('robmenu', 'Open Outlaw Robbery Creator', 'keyboard', 'F7')
+
+RegisterNUICallback('close', function(_, cb) close_ui(); cb(true) end)
+
+RegisterNUICallback('coords', function(_, cb)
+  local p = PlayerPedId()
+  local coords = GetEntityCoords(p)
+  local heading = GetEntityHeading(p)
+  cb({ x = coords.x, y = coords.y, z = coords.z, h = heading })
+end)
+
+RegisterNUICallback('create', function(data, cb)
+  TriggerServerEvent('orc:create', data or {})
+  cb(true)
+end)
+
+RegisterNUICallback('update', function(data, cb)
+  TriggerServerEvent('orc:update', data or {})
+  cb(true)
+end)
+
+RegisterNUICallback('delete', function(data, cb)
+  TriggerServerEvent('orc:delete', data and data.id or 0)
+  cb(true)
+end)
+
+-- ===== ox_target visualisation des spots =====
+local function clear_zone(id)
+  local z = zones[id]
+  if not z then return end
+  local ok = pcall(function() return exports.ox_target end)
+  if ok then
+    if type(z) == 'number' then
+      exports.ox_target:removeZone(z)
+    else
+      exports.ox_target:removeLocalEntity(z)
+    end
+  end
+  zones[id] = nil
+end
+
+local function add_zone(entry)
+  if not Config.UseOxTarget then return end
+  local ok = pcall(function() return exports.ox_target end); if not ok then return end
+  clear_zone(entry.id)
+
+  local opts = { {
+    name = ('orc:spot:%d'):format(entry.id),
+    name = ('orc:spot:%d'):format(entry.id),
+    icon = (Config.Target and Config.Target.Icon) or 'fa-solid fa-sack-dollar',
+    label = (Config.Target and Config.Target.Label) or 'Inspecter le spot',
+    distance = 2.5,
+    onSelect = function()
+      -- Ici tu pourras brancher ta logique de braquage
+      lib.notify({title='Spot', description=('ID %d • %s'):format(entry.id, entry.label or '?'), type='inform'})
+    end
+  } }
+
+  -- Add robbery option
+  opts[#opts+1] = {
+    name = ('orc:rob:%d'):format(entry.id),
+    icon = 'fa-solid fa-lock',
+    label = 'Forcer le coffre',
+    distance = 2.5,
+    onSelect = function()
+      -- Ask server if we can start robbery (perm, cops, cooldown, lockpick, etc.)
+      local ok = lib.callback.await('orc:rob:begin', false, entry.id)
+      if not ok or not ok.ok then
+        local r = ok and ok.reason or 'blocked'
+        local msg = (r=='cooldown' and ('En cooldown (%ds)'):format(ok.remain or 0))
+                  or (r=='cops' and ('Pas assez de police (%d/%d)'):format(ok.have or 0, ok.need or 0))
+                  or (r=='nolockpick' and 'Lockpick requis')
+                  or (r=='police_block' and 'Police ne peut pas braquer')
+                  or 'Action impossible'
+        lib.notify({title='Robbery', description=msg, type='error'})
+        return
+      end
+
+      -- Client minigame: lockpick + progress
+      local passed = true
+      if Config.Robbery and Config.Robbery.Skillcheck then
+        passed = lib.skillCheck(Config.Robbery.Skillcheck)
+      end
+      if not passed then
+        lib.notify({title='Robbery', description='Échec du crochetage', type='error'})
+        return
+      end
+
+      local dur = (ok and ok.duration) or (Config.Robbery and Config.Robbery.Duration) or 8000
+      local cancelled = not lib.progressCircle({
+        duration = dur,
+        label = 'Ramasser l\'argent...',
+        position = 'bottom',
+        useWhileDead = false,
+        canCancel = true,
+        disable = Config.Robbery and Config.Robbery.FreezePlayer and {
+          move = true, car = true, combat = true
+        } or {}
+      })
+      if cancelled then return end
+
+      -- Success
+      TriggerServerEvent('orc:rob:finish', entry.id)
+    end
+  }
+
+  local id = exports.ox_target:addSphereZone({
+    coords = vec3(entry.x, entry.y, entry.z),
+    radius = tonumber(entry.radius) or 2.0,
+    debug = false,
+    options = opts })
+  zones[entry.id] = id
+end
+
+RegisterNetEvent('orc:echo', function(payload)
+  if payload.kind == 'error' then
+    SendNUIMessage({ action='echo', payload=payload })
+    return
+  end
+  if payload.kind == 'created' or payload.kind == 'updated' then
+    add_zone(payload.data)
+  elseif payload.kind == 'deleted' then
+    clear_zone(payload.data)
+  end
+  SendNUIMessage({ action='echo', payload=payload })
+end)
+
+-- Au start: reconstruire les zones depuis la liste
+CreateThread(function()
+  Wait(500)
+  local data = lib.callback.await('orc:list', false)
+  if not data or data.error then return end
+  for _, e in ipairs(data.list or {}) do add_zone(e) end
+end)
