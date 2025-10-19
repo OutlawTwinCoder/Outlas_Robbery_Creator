@@ -73,12 +73,22 @@ local function add_zone(entry)
   local ok = pcall(function() return exports.ox_target end); if not ok then return end
   clear_zone(entry.id)
 
+  local targetConfig = Config.Target or {}
+  local defaultDistance = tonumber(targetConfig.Distance)
+    or tonumber(targetConfig.distance)
+    or tonumber(targetConfig.Radius)
+    or tonumber(targetConfig.radius)
+    or 2.5
+  local defaultRadius = tonumber(targetConfig.Radius)
+    or tonumber(targetConfig.radius)
+    or tonumber(targetConfig.Distance)
+    or tonumber(targetConfig.distance)
+    or 2.0
   local opts = { {
     name = ('orc:spot:%d'):format(entry.id),
-    name = ('orc:spot:%d'):format(entry.id),
-    icon = (Config.Target and Config.Target.Icon) or 'fa-solid fa-sack-dollar',
-    label = (Config.Target and Config.Target.Label) or 'Inspecter le spot',
-    distance = 2.5,
+    icon = targetConfig.Icon or 'fa-solid fa-sack-dollar',
+    label = targetConfig.Label or 'Inspecter le spot',
+    distance = defaultDistance,
     onSelect = function()
       -- Ici tu pourras brancher ta logique de braquage
       lib.notify({title='Spot', description=('ID %d • %s'):format(entry.id, entry.label or '?'), type='inform'})
@@ -135,8 +145,8 @@ local function add_zone(entry)
 
   local id = exports.ox_target:addSphereZone({
     coords = vec3(entry.x, entry.y, entry.z),
-    radius = tonumber(entry.radius) or 2.0,
-    debug = false,
+    radius = tonumber(entry.radius) or defaultRadius,
+    debug = targetConfig.Debug == true,
     options = opts })
   zones[entry.id] = id
 end
